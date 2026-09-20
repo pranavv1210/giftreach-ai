@@ -701,7 +701,7 @@ function Review({
   const [selected, setSelected] = useState<number[]>([]),
     [preview, setPreview] = useState<Obj | null>(null),
     [sendPlan, setSendPlan] = useState<Obj | null>(null);
-  const eligible = data.filter((x) => x.draft_id && x.eligible);
+  const reviewable = data.filter((x) => x.draft_id);
   const toggle = (id: number) =>
     setSelected((s) =>
       s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
@@ -719,16 +719,16 @@ function Review({
             <input
               type="checkbox"
               checked={
-                eligible.length > 0 &&
-                eligible.every((x) => selected.includes(x.draft_id))
+                reviewable.length > 0 &&
+                reviewable.every((x) => selected.includes(x.draft_id))
               }
               onChange={(e) =>
                 setSelected(
-                  e.target.checked ? eligible.map((x) => x.draft_id) : [],
+                  e.target.checked ? reviewable.map((x) => x.draft_id) : [],
                 )
               }
             />
-            Select all eligible
+            Select all drafts
           </label>
           <span>{selected.length} selected</span>
         </div>
@@ -795,6 +795,22 @@ function Review({
                   <a href={x.source_url} target="_blank">
                     {x.source_type} <ExternalLink size={11} />
                   </a>
+                  {![
+                    "MX_VALID",
+                    "PROVIDER_VERIFIED",
+                    "MANUALLY_VERIFIED",
+                  ].includes(x.verification_status) && (
+                    <button
+                      className="verify-link"
+                      disabled={busy || !x.source_url}
+                      title="Inspect the source link before manually verifying"
+                      onClick={() =>
+                        action(`/api/contacts/${x.contact_id}/verify-manually`)
+                      }
+                    >
+                      Mark verified
+                    </button>
+                  )}
                 </td>
                 <td>
                   <strong>{x.score}/100</strong>
@@ -878,19 +894,21 @@ function Review({
               </small>
             ))}
             <button
-              disabled={!sendPlan.eligible.length}
+              disabled={
+                !sendPlan.eligible.length ||
+                sendPlan.gmail.status !== "CONNECTED"
+              }
               onClick={async () => {
                 await action("/api/review/bulk/send", {
                   draft_ids: sendPlan.eligible,
-                  provider:
-                    sendPlan.gmail.status === "CONNECTED" ? "gmail" : "mock",
+                  provider: "gmail",
                   confirm: true,
                 });
                 setSendPlan(null);
                 setSelected([]);
               }}
             >
-              Confirm and send {sendPlan.eligible.length}
+              Send {sendPlan.eligible.length} with Gmail
             </button>
           </article>
         </div>

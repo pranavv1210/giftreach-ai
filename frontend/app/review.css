@@ -1,0 +1,8 @@
+.review-table .verify-link {
+  justify-content: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #39733c;
+  font-size: 12px;
+}
