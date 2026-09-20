@@ -10,4 +10,4 @@ coverage/
 dist/
 .workstate/
 *.log
-
+*.tsbuildinfo
