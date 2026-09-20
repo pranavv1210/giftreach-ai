@@ -30,6 +30,20 @@ def test_autonomous_pipeline_dedupes_and_builds_review_queue(client,auth,monkeyp
     assert len(client.get("/api/companies",headers=auth).json())==1
     assert len(client.get("/api/contacts",headers=auth).json())==1
 
+def test_discovery_researches_official_website_not_evidence_page(client,auth,monkeypatch):
+    from app import worker
+    researched=[]
+    monkeypatch.setattr(worker.OverpassDiscoveryProvider,"discover_companies",lambda self,c,l:[CompanyFinding("Mapped Co","mapped.example","https://mapped.example","https://www.openstreetmap.org/node/1","Mapped business", "OpenStreetMap: Bengaluru")])
+    monkeypatch.setattr(worker.OfficialWebsiteContactProvider,"discover",lambda self,website,limit:researched.append(website) or [])
+    r=client.post("/api/discovery-campaigns",headers=auth,json={"name":"Free search","provider":"overpass","max_companies":1})
+    client.patch("/api/agent",headers=auth,json={"mode":"RESEARCH"});client.post(f"/api/discovery-campaigns/{r.json()['id']}/start",headers=auth)
+    process_one();process_one()
+    assert researched==["https://mapped.example"]
+    company=client.get("/api/companies",headers=auth).json()[0]
+    assert company["source_url"]=="https://mapped.example"
+    assert "openstreetmap.org/node/1" in company["evidence"]
+    assert company["industry"] is None
+
 def test_bulk_approval_and_send_preview_excludes_unverified(client,auth,monkeypatch):
     from app import worker
     monkeypatch.setattr(worker.BraveDiscoveryProvider,"discover_companies",lambda self,q,l:[CompanyFinding("Acme","acme.example","https://acme.example","https://source.example","Evidence",q[0])])

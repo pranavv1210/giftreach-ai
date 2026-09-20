@@ -46,10 +46,13 @@ def _discover(db,campaign,job):
     for index,f in enumerate(findings):
         company=db.scalar(select(Company).where((Company.domain==f.domain)|(Company.name==f.name)))
         if not company:
-            company=Company(name=f.name,domain=f.domain,city=(campaign.cities or ["Bengaluru"])[0],district=(campaign.districts or ["Karnataka"])[0],industry=(campaign.industries or [None])[0],source_url=f.source_url,evidence=f.evidence);db.add(company);db.flush()
+            company=Company(name=f.name,domain=f.domain,city=(campaign.cities or ["Bengaluru"])[0],district=(campaign.districts or ["Karnataka"])[0],industry=None,source_url=f.website,evidence=f"{f.evidence} Source: {f.source_url}");db.add(company);db.flush()
+        elif company.source_url and "openstreetmap.org" in company.source_url:
+            company.source_url=f.website
+            company.evidence=f"{f.evidence} Source: {f.source_url}"
         score_company(company)
         if not db.scalar(select(CampaignProspect).where(CampaignProspect.campaign_id==campaign.id,CampaignProspect.company_id==company.id,CampaignProspect.contact_id.is_(None))):db.add(CampaignProspect(campaign_id=campaign.id,company_id=company.id,source_query=f.query))
-        enqueue(db,"RESEARCH_COMPANY",campaign.id,company.id);job.progress=int((index+1)/max(len(findings),1)*100)
+        enqueue(db,"RESEARCH_COMPANY",campaign.id,company.id,suffix=str(job.id));job.progress=int((index+1)/max(len(findings),1)*100)
     campaign.discovered_count=len(findings);campaign.status="RUNNING";db.add(Activity(event="discovery.completed",message=f"Discovered {len(findings)} company websites for {campaign.name}",entity_type="campaign",entity_id=campaign.id))
 def _research(db,campaign,job):
     company=db.scalar(select(Company).options(selectinload(Company.contacts)).where(Company.id==job.entity_id))
