@@ -2,10 +2,11 @@ import re
 from dataclasses import dataclass
 from html import unescape
 from urllib.parse import urlparse, urljoin
+from urllib.robotparser import RobotFileParser
 import httpx
 from .config import get_settings
 
-ROLE_WORDS=("hr","human resources","people","employee engagement","administration","admin","procurement","workplace","talent","culture")
+ROLE_WORDS=("hr","human resources","people","employee engagement","administration","admin","procurement","workplace","talent","culture","career","recruit","hiring")
 EMAIL_RE=re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}",re.I)
 class ProviderUnavailable(RuntimeError): pass
 
@@ -39,21 +40,50 @@ class OfficialWebsiteContactProvider:
     name="official_website"
     def __init__(self,client=None): self.client=client or httpx.Client(timeout=12,follow_redirects=True,headers={"User-Agent":"GiftReachResearch/1.0"})
     def discover(self,website,limit=3):
-        pages=[website,urljoin(website,"/contact"),urljoin(website,"/about"),urljoin(website,"/team"),urljoin(website,"/careers")]
-        host=urlparse(website).netloc.lower().removeprefix("www.");found={}
-        for url in pages:
+        parsed=urlparse(website if "://" in website else "https://"+website);origin=f"{parsed.scheme}://{parsed.netloc}";host=parsed.netloc.lower().removeprefix("www.")
+        pages=[origin,urljoin(origin,"/contact"),urljoin(origin,"/contact-us"),urljoin(origin,"/about"),urljoin(origin,"/team"),urljoin(origin,"/careers"),urljoin(origin,"/jobs"),urljoin(origin,"/people")]
+        found={};visited=set();robots=RobotFileParser()
+        try:
+            rr=self.client.get(urljoin(origin,"/robots.txt"));robots.set_url(urljoin(origin,"/robots.txt"));robots.parse(rr.text.splitlines() if rr.status_code==200 else [])
+        except httpx.HTTPError:robots.parse([])
+        try:
+            sm=self.client.get(urljoin(origin,"/sitemap.xml"))
+            if sm.status_code==200:
+                for loc in re.findall(r"<loc>\s*([^<]+)\s*</loc>",sm.text,re.I):
+                    if self._candidate_link(loc,host):pages.append(unescape(loc.strip()))
+        except httpx.HTTPError:pass
+        index=0
+        while index<len(pages) and len(visited)<15 and len(found)<limit:
+            url=pages[index];index+=1
+            if url in visited or not robots.can_fetch("GiftReachResearch/1.0",url):continue
+            visited.add(url)
             try:
                 r=self.client.get(url)
                 if r.status_code!=200 or "text/html" not in r.headers.get("content-type",""):continue
                 text=unescape(r.text[:2_000_000]);lower=text.lower()
+                for href in re.findall(r'href=["\']([^"\'#]+)',text,re.I):
+                    link=urljoin(str(r.url),unescape(href.strip()))
+                    if self._candidate_link(link,host) and link not in visited and link not in pages:pages.append(link)
                 for email in EMAIL_RE.findall(text):
                     email=email.lower().strip(".,;:>")
                     if email.split("@")[-1].removeprefix("www.")!=host:continue
                     pos=lower.find(email);context=lower[max(0,pos-120):pos+len(email)+120];local=email.split("@")[0]
-                    if any(w in context or w in local for w in ROLE_WORDS) and email not in found:found[email]=ContactFinding(email,url,"Publicly listed on the official company website",.65)
+                    relevant=any(w in context or w in local for w in ROLE_WORDS)
+                    if relevant and email not in found:
+                        recruitment=any(w in local or w in context for w in ("career","careers","jobs","recruit","hiring"))
+                        kind="PUBLIC_RECRUITMENT" if recruitment else "PUBLICLY_LISTED"
+                        confidence=.45 if recruitment else .7
+                        description="Public recruitment inbox on the official company website; role relevance requires founder review" if recruitment else "Public HR, People, Administration, or Procurement inbox on the official company website"
+                        found[email]=ContactFinding(email,str(r.url),description,confidence,kind)
                     if len(found)>=limit:return list(found.values())
             except (httpx.HTTPError,ValueError):continue
         return list(found.values())
+    @staticmethod
+    def _candidate_link(url,host):
+        p=urlparse(url);link_host=p.netloc.lower().removeprefix("www.")
+        if link_host!=host:return False
+        path=(p.path+"?"+p.query).lower()
+        return any(word in path for word in ("contact","career","job","people","team","about","human-resource","hr","talent","culture","procurement","admin"))
 
 class OverpassDiscoveryProvider:
     name="overpass"

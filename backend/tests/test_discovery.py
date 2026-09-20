@@ -62,3 +62,23 @@ def test_cancel_persistent_jobs(client,auth):
     cancelled=client.post(f"/api/discovery-campaigns/{c['id']}/cancel",headers=auth)
     assert cancelled.json()["status"]=="CANCELLED"
     assert client.get(f"/api/jobs?campaign_id={c['id']}",headers=auth).json()[0]["status"]=="CANCELLED"
+
+def test_official_site_crawler_follows_nested_careers_and_classifies():
+    from app.providers import OfficialWebsiteContactProvider
+    class Response:
+        def __init__(self,url,text,status=200,content_type="text/html"):self.url=url;self.text=text;self.status_code=status;self.headers={"content-type":content_type}
+    class Client:
+        def get(self,url):
+            pages={
+                "https://example.com/robots.txt":Response(url,"User-agent: *\nAllow: /"),
+                "https://example.com/sitemap.xml":Response(url,"<urlset><url><loc>https://example.com/company/careers</loc></url></urlset>",content_type="application/xml"),
+                "https://example.com":Response(url,'<a href="/company/careers">Work here</a>'),
+                "https://example.com/company/careers":Response(url,"For careers, email careers@example.com"),
+            }
+            return pages.get(url,Response(url,"",404))
+    found=OfficialWebsiteContactProvider(Client()).discover("https://example.com",3)
+    assert len(found)==1
+    assert found[0].email=="careers@example.com"
+    assert found[0].source_type=="PUBLIC_RECRUITMENT"
+    assert found[0].source_url=="https://example.com/company/careers"
+    assert found[0].confidence<.5
