@@ -1,3 +1,9 @@
+databases:
+  - name: giftreach-db
+    databaseName: giftreach
+    user: giftreach
+    plan: free
+
 services:
   - type: web
     name: giftreach-api
@@ -18,7 +24,9 @@ services:
       - key: OWNER_PASSWORD
         sync: false
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: giftreach-db
+          property: connectionString
       - key: GMAIL_CLIENT_ID
         sync: false
       - key: GMAIL_CLIENT_SECRET
