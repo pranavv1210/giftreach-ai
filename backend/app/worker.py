@@ -50,6 +50,7 @@ def _discover(db,campaign,job):
         elif company.source_url and "openstreetmap.org" in company.source_url:
             company.source_url=f.website
             company.evidence=f"{f.evidence} Source: {f.source_url}"
+            company.industry=None
         score_company(company)
         if not db.scalar(select(CampaignProspect).where(CampaignProspect.campaign_id==campaign.id,CampaignProspect.company_id==company.id,CampaignProspect.contact_id.is_(None))):db.add(CampaignProspect(campaign_id=campaign.id,company_id=company.id,source_query=f.query))
         enqueue(db,"RESEARCH_COMPANY",campaign.id,company.id,suffix=str(job.id));job.progress=int((index+1)/max(len(findings),1)*100)
