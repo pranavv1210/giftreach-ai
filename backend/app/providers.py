@@ -55,6 +55,26 @@ class OfficialWebsiteContactProvider:
             except (httpx.HTTPError,ValueError):continue
         return list(found.values())
 
+class OverpassDiscoveryProvider:
+    name="overpass"
+    def __init__(self,client=None):self.client=client or httpx.Client(timeout=45,follow_redirects=True,headers={"User-Agent":"GiftReachAI/1.0 (owner-operated business research)"})
+    def discover_companies(self,campaign,limit):
+        locations=campaign.cities or campaign.districts or ["Bengaluru"];findings=[];seen=set()
+        for location in locations[:3]:
+            safe=re.sub(r'[^A-Za-z0-9 ._-]','',location)
+            query=f'[out:json][timeout:30];area["name"="{safe}"]["boundary"="administrative"]->.a;(nwr(area.a)["name"]["website"]["office"];nwr(area.a)["name"]["website"]["company"];nwr(area.a)["name"]["contact:website"]["office"];);out tags center {min(limit,100)};'
+            r=self.client.post(get_settings().overpass_api_url,data={"data":query});r.raise_for_status()
+            for item in r.json().get("elements",[]):
+                tags=item.get("tags",{});website=tags.get("website") or tags.get("contact:website");name=tags.get("name")
+                if not website or not name:continue
+                if not website.startswith(("http://","https://")):website="https://"+website
+                host=urlparse(website).netloc.lower().removeprefix("www.")
+                if not host or host in seen:continue
+                seen.add(host);osm_url=f"https://www.openstreetmap.org/{item.get('type')}/{item.get('id')}"
+                findings.append(CompanyFinding(name,host,website,osm_url,f"OpenStreetMap business record in {location}",f"OpenStreetMap: {location}"))
+                if len(findings)>=limit:return findings
+        return findings
+
 def campaign_queries(campaign):
     locations=campaign.cities or campaign.districts or ["Bengaluru"];industries=campaign.industries or ["company","business"]
     return [f'{industry} companies in {location} Karnataka official website' for location in locations for industry in industries[:5]][:10]

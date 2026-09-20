@@ -110,7 +110,7 @@ class DiscoveryCampaign(Base, TimestampMixin):
     score_threshold: Mapped[float] = mapped_column(Float, default=40)
     max_companies: Mapped[int] = mapped_column(Integer, default=25)
     max_contacts_per_company: Mapped[int] = mapped_column(Integer, default=3)
-    provider: Mapped[str] = mapped_column(String(80), default="brave")
+    provider: Mapped[str] = mapped_column(String(80), default="overpass")
     generate_drafts: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str] = mapped_column(String(30), default="DRAFT")
     discovered_count: Mapped[int] = mapped_column(Integer, default=0)

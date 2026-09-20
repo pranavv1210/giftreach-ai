@@ -17,7 +17,7 @@ def campaign_out(c):return {"id":c.id,"name":c.name,"cities":c.cities,"districts
 def list_campaigns(db:Session=Depends(get_db),user=Depends(current_user)):return [campaign_out(c) for c in db.scalars(select(DiscoveryCampaign).order_by(DiscoveryCampaign.created_at.desc())).all()]
 @router.post("/discovery-campaigns",status_code=201)
 def create_campaign(data:DiscoveryCampaignIn,db:Session=Depends(get_db),user=Depends(require_csrf)):
-    if data.provider not in ("brave",):raise HTTPException(422,"Only the Brave live provider is currently supported")
+    if data.provider not in ("brave","overpass"):raise HTTPException(422,"Supported providers are overpass and brave")
     c=DiscoveryCampaign(**data.model_dump());db.add(c);db.flush();db.add(Activity(event="campaign.created",message=f"Created discovery campaign {c.name}",entity_type="campaign",entity_id=c.id));db.commit();db.refresh(c);return campaign_out(c)
 @router.post("/discovery-campaigns/{campaign_id}/start")
 def start(campaign_id:int,db:Session=Depends(get_db),user=Depends(require_csrf)):

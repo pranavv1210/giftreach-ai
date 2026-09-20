@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     search_api_key: str | None = None
     email_verification_api_key: str | None = None
     brave_search_api_key: str | None = None
+    overpass_api_url: str = "https://overpass-api.de/api/interpreter"
+    default_discovery_provider: str = "overpass"
     token_encryption_key: str | None = None
     worker_poll_seconds: int = 3
     environment: str = "development"

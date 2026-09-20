@@ -24,7 +24,7 @@ class DiscoveryCampaignIn(BaseModel):
     score_threshold: float = Field(40,ge=0,le=100)
     max_companies: int = Field(25,ge=1,le=200)
     max_contacts_per_company: int = Field(3,ge=1,le=10)
-    provider: str = "brave"
+    provider: str = "overpass"
     generate_drafts: bool = True
 
 class BulkDraftAction(BaseModel):

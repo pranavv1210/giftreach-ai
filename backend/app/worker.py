@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from .db import SessionLocal
 from .models import DiscoveryCampaign,CampaignProspect,Job,Company,Contact,ContactSource,Draft,AgentSettings,Activity
-from .providers import BraveDiscoveryProvider,OfficialWebsiteContactProvider,campaign_queries,ProviderUnavailable
+from .providers import BraveDiscoveryProvider,OverpassDiscoveryProvider,OfficialWebsiteContactProvider,campaign_queries,ProviderUnavailable
 from .services import score_company,generate_draft,validate_email
 
 WORKER_ID=f"worker-{uuid.uuid4().hex[:8]}";_stop=threading.Event();_thread=None
@@ -40,8 +40,9 @@ def process_one():
             db.add(Activity(event="job.failed",message=f"{job.job_type} failed: {job.error_message}",entity_type="job",entity_id=job.id))
         db.commit();return True
 def _discover(db,campaign,job):
-    if campaign.provider!="brave":raise ProviderUnavailable(f"Provider '{campaign.provider}' is not available for live discovery")
-    findings=BraveDiscoveryProvider().discover_companies(campaign_queries(campaign),campaign.max_companies)
+    if campaign.provider=="brave":findings=BraveDiscoveryProvider().discover_companies(campaign_queries(campaign),campaign.max_companies)
+    elif campaign.provider=="overpass":findings=OverpassDiscoveryProvider().discover_companies(campaign,campaign.max_companies)
+    else:raise ProviderUnavailable(f"Provider '{campaign.provider}' is not available for live discovery")
     for index,f in enumerate(findings):
         company=db.scalar(select(Company).where((Company.domain==f.domain)|(Company.name==f.name)))
         if not company:
