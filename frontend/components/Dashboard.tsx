@@ -700,7 +700,8 @@ function Review({
 }) {
   const [selected, setSelected] = useState<number[]>([]),
     [preview, setPreview] = useState<Obj | null>(null),
-    [sendPlan, setSendPlan] = useState<Obj | null>(null);
+    [sendPlan, setSendPlan] = useState<Obj | null>(null),
+    [sendResult, setSendResult] = useState<Obj | null>(null);
   const reviewable = data.filter((x) => x.draft_id);
   const toggle = (id: number) =>
     setSelected((s) =>
@@ -713,6 +714,15 @@ function Review({
   }
   return (
     <>
+      {sendResult && (
+        <div className="send-result" role="status">
+          <strong>{sendResult.sent.length} email(s) sent with Gmail.</strong>
+          <span>{sendResult.excluded.length} excluded or failed.</span>
+          <button className="icon" onClick={() => setSendResult(null)}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
       <div className="review-toolbar">
         <div>
           <label className="check">
@@ -899,11 +909,12 @@ function Review({
                 sendPlan.gmail.status !== "CONNECTED"
               }
               onClick={async () => {
-                await action("/api/review/bulk/send", {
+                const result = await action("/api/review/bulk/send", {
                   draft_ids: sendPlan.eligible,
                   provider: "gmail",
                   confirm: true,
                 });
+                setSendResult(result);
                 setSendPlan(null);
                 setSelected([]);
               }}

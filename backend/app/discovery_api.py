@@ -97,6 +97,7 @@ def bulk_send(data:BulkSendAction,db:Session=Depends(get_db),user=Depends(requir
                 c=db.get(Contact,d.contact_id)
                 ensure_send_eligible(db,d)
                 result=send_gmail(db,c.email,d.subject,d.body);d.status="SENT";d.sent_at=datetime.utcnow();d.provider_message_id=result.get("id");sent.append(d.id)
+                db.add(Activity(event="email.sent",message=f"Gmail sent to {c.email}",entity_type="draft",entity_id=d.id,details={"provider":"gmail","message_id":d.provider_message_id}))
             elif data.provider=="mock":send_mock(db,d);sent.append(d.id)
             else:raise ValueError("Unknown send provider")
         except Exception as exc:excluded.append({"id":d.id,"reason":str(exc)})

@@ -6,3 +6,15 @@
   color: #39733c;
   font-size: 12px;
 }
+.send-result {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 13px 16px;
+  border: 1px solid #b9d4ba;
+  background: #f1f8f1;
+  color: #285b2b;
+  font-size: 13px;
+}
