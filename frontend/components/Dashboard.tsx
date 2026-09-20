@@ -79,7 +79,7 @@ export default function Dashboard({ section }: { section: string }) {
         contacts: "/api/contacts",
         campaigns: "/api/discovery-campaigns",
         "email-review": "/api/review",
-        pipeline: "/api/drafts",
+        pipeline: "/api/review",
         agent: "/api/agent",
         integrations: "/api/integrations",
         settings: "/api/agent",
@@ -93,6 +93,11 @@ export default function Dashboard({ section }: { section: string }) {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    if (section !== "pipeline") return;
+    const timer = window.setInterval(load, 8000);
+    return () => window.clearInterval(timer);
+  }, [load, section]);
   async function action(path: string, body?: Obj, method = "POST") {
     setBusy(true);
     setError("");
@@ -290,23 +295,7 @@ function View({
       "BOUNCED",
       "SUPPRESSED",
     ];
-    return (
-      <div className="pipeline">
-        {stages.map((s) => (
-          <article key={s}>
-            <div>
-              <span>{s}</span>
-              <strong>{data.filter((d: Obj) => d.status === s).length}</strong>
-            </div>
-            {data
-              .filter((d: Obj) => d.status === s)
-              .map((d: Obj) => (
-                <p key={d.id}>{d.subject}</p>
-              ))}
-          </article>
-        ))}
-      </div>
-    );
+    return <div className="pipeline-shell"><div className="pipeline-note"><span className="pulse"/><span>Live pipeline refreshes every 8 seconds</span></div><div className="pipeline-board">{stages.map((s,stageIndex) => {const items=data.filter((d:Obj)=>d.draft_status===s);return <section className={`pipeline-stage stage-${s.toLowerCase()}`} key={s}><header><span>{s}</span><strong>{items.length}</strong></header><div className="pipeline-stack">{items.map((d:Obj,index:number)=><article className="pipeline-card" key={d.draft_id} style={{animationDelay:`${Math.min(stageIndex*45+index*30,420)}ms`}}><strong>{d.company}</strong><span>{d.subject}</span><small>{d.email}</small>{s==="SENT"&&<time>{d.sent_at?new Date(d.sent_at).toLocaleString():"Sent with Gmail"}</time>}</article>)}{!items.length&&<p className="stage-empty">No {s.toLowerCase()} messages</p>}</div></section>})}</div></div>;
   }
   if (section === "agent")
     return (
@@ -721,6 +710,15 @@ function Review({
           <button className="icon" onClick={() => setSendResult(null)}>
             <X size={16} />
           </button>
+          {sendResult.excluded.length > 0 && (
+            <div className="send-failures">
+              {sendResult.excluded.map((item: Obj) => (
+                <span key={item.id}>
+                  Draft {item.id}: {item.reason}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="review-toolbar">

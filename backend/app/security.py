@@ -19,5 +19,5 @@ def require_csrf(user=__import__('fastapi').Depends(current_user), x_csrf_token:
     if not x_csrf_token or not secrets.compare_digest(x_csrf_token,user["csrf"]): raise HTTPException(403,"Invalid CSRF token")
     return user
 def set_session(response: Response, token: str):
-    response.set_cookie("session",token,httponly=True,samesite="lax",secure=get_settings().environment=="production",max_age=43200)
-
+    production=get_settings().environment=="production"
+    response.set_cookie("session",token,httponly=True,samesite="none" if production else "lax",secure=production,max_age=43200)

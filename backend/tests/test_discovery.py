@@ -54,7 +54,7 @@ def test_bulk_approval_and_send_preview_excludes_unverified(client,auth,monkeypa
     assert approved.status_code==200 and approved.json()["approved"]==[item["draft_id"]]
     plan=client.post("/api/review/bulk/preview-send",headers=auth,json={"draft_ids":[item["draft_id"]]}).json()
     assert plan["eligible"]==[]
-    assert "not verified" in plan["excluded"][0]["reasons"][0]
+    assert "paused" in plan["excluded"][0]["reasons"][0]
     assert client.post("/api/review/bulk/send",headers=auth,json={"draft_ids":[item["draft_id"]],"provider":"mock","confirm":False}).status_code==422
 
 def test_cancel_persistent_jobs(client,auth):

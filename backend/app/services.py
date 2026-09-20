@@ -47,7 +47,7 @@ def ensure_send_eligible(db: Session, draft: Draft):
     if settings.mode!="CONTROLLED_AUTOPILOT": raise ValueError("Controlled autopilot is not enabled")
     if draft.status not in ("APPROVED","SENT"): raise ValueError("Draft is not approved")
     if contact.suppressed or company.suppressed: raise ValueError("Recipient or company is suppressed")
-    if contact.verification_status not in ("MX_VALID","PROVIDER_VERIFIED","MANUALLY_VERIFIED"): raise ValueError("Recipient email is not send-eligible")
+    if contact.verification_status not in ("MX_VALID","PROVIDER_VERIFIED","MANUALLY_VERIFIED"): raise ValueError("Recipient email is not verified for sending")
     if draft.validation_errors: raise ValueError("Draft failed policy validation")
     now=datetime.utcnow(); daily=db.scalar(select(func.count(Draft.id)).where(Draft.sent_at>=now-timedelta(days=1))) or 0
     hourly=db.scalar(select(func.count(Draft.id)).where(Draft.sent_at>=now-timedelta(hours=1))) or 0

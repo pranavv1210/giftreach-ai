@@ -59,7 +59,7 @@ def review(campaign_id:int|None=None,status:str|None=None,db:Session=Depends(get
         if contact.verification_status not in ("MX_VALID","PROVIDER_VERIFIED","MANUALLY_VERIFIED"):reasons.append("Email is not independently verified")
         if not draft:reasons.append("Draft not generated")
         elif draft.validation_errors:reasons.extend(draft.validation_errors)
-        rows.append({"prospect_id":link.id,"campaign_id":camp.id,"campaign":camp.name,"campaign_status":camp.status,"company":company.name,"industry":company.industry,"size":company.size,"city":company.city,"score":company.score,"contact_id":contact.id,"contact":contact.name,"title":contact.title,"email":contact.email,"verification_status":contact.verification_status,"confidence":contact.confidence,"source_type":source.source_type if source else None,"source_url":source.source_url if source else None,"source_description":source.description if source else None,"draft_id":draft.id if draft else None,"subject":draft.subject if draft else None,"body":draft.body if draft else None,"draft_status":draft.status if draft else "MISSING","eligible":eligible,"exclusion_reasons":reasons})
+        rows.append({"prospect_id":link.id,"campaign_id":camp.id,"campaign":camp.name,"campaign_status":camp.status,"company":company.name,"industry":company.industry,"size":company.size,"city":company.city,"score":company.score,"contact_id":contact.id,"contact":contact.name,"title":contact.title,"email":contact.email,"verification_status":contact.verification_status,"confidence":contact.confidence,"source_type":source.source_type if source else None,"source_url":source.source_url if source else None,"source_description":source.description if source else None,"draft_id":draft.id if draft else None,"subject":draft.subject if draft else None,"body":draft.body if draft else None,"draft_status":draft.status if draft else "MISSING","sent_at":draft.sent_at if draft else None,"provider_message_id":draft.provider_message_id if draft else None,"eligible":eligible,"exclusion_reasons":reasons})
     return rows
 def _drafts(db,ids):return db.scalars(select(Draft).where(Draft.id.in_(ids))).all()
 @router.post("/review/bulk/approve")
@@ -80,9 +80,8 @@ def preview_send(data:BulkDraftAction,db:Session=Depends(get_db),user=Depends(cu
     settings=db.get(AgentSettings,1);eligible=[];excluded=[]
     for d in _drafts(db,data.draft_ids):
         c=db.get(Contact,d.contact_id);reasons=[]
-        if d.status!="APPROVED":reasons.append("Draft not approved")
-        if c.suppressed:reasons.append("Contact suppressed")
-        if c.verification_status not in ("MX_VALID","PROVIDER_VERIFIED","MANUALLY_VERIFIED"):reasons.append("Email is not verified")
+        try:ensure_send_eligible(db,d)
+        except ValueError as exc:reasons.append(str(exc))
         if reasons:excluded.append({"id":d.id,"email":c.email,"reasons":reasons})
         else:eligible.append(d.id)
     conn=db.get(GmailConnection,1)

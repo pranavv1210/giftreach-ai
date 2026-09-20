@@ -18,3 +18,11 @@
   color: #285b2b;
   font-size: 13px;
 }
+.send-failures {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #cde0ce;
+  color: #8b2d2d;
+}
