@@ -7,20 +7,25 @@ from sqlalchemy.orm import Session, selectinload
 from . import __version__
 from .config import get_settings, APPROVED_CATEGORIES
 from .db import Base, engine, get_db
-from .models import Company, Contact, ContactSource, Campaign, Draft, Activity, AgentSettings
+from .models import Company, Contact, ContactSource, Campaign, Draft, Activity, AgentSettings, GmailConnection
 from .schemas import *
 from .security import current_user, require_csrf, create_session, set_session
 from .services import score_company, generate_draft, validate_email, send_mock
+from .discovery_api import router as discovery_router
+from .worker import start_worker, stop_worker
 
 @asynccontextmanager
 async def lifespan(app):
     Base.metadata.create_all(engine)
     with next(get_db()) as db:
         if not db.get(AgentSettings,1): db.add(AgentSettings(id=1,approved_categories=list(APPROVED_CATEGORIES))); db.commit()
+    start_worker()
     yield
+    stop_worker()
 
 app=FastAPI(title="GiftReach AI",version=__version__,lifespan=lifespan)
 app.add_middleware(CORSMiddleware,allow_origins=[get_settings().frontend_origin],allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
+app.include_router(discovery_router)
 
 def audit(db,event,message,entity_type=None,entity_id=None): db.add(Activity(event=event,message=message,entity_type=entity_type,entity_id=entity_id))
 def company_out(c): return {"id":c.id,"name":c.name,"domain":c.domain,"industry":c.industry,"size":c.size,"city":c.city,"district":c.district,"evidence":c.evidence,"source_url":c.source_url,"score":c.score,"score_breakdown":c.score_breakdown,"suppressed":c.suppressed,"contact_count":len(c.contacts)}
@@ -120,6 +125,7 @@ def patch_agent(data:AgentPatch,db:Session=Depends(get_db),user=Depends(require_
     for k,v in data.model_dump(exclude_none=True).items():
         if k=="mode" and v not in ("OFF","RESEARCH","DRAFT","CONTROLLED_AUTOPILOT"):raise HTTPException(422,"Invalid mode")
         setattr(s,k,v)
+    if data.mode and data.mode!="OFF":s.kill_switch=False;s.paused=False
     audit(db,"agent.updated",f"Agent set to {s.mode}","agent",1);db.commit();return settings_out(s)
 @app.post("/api/agent/emergency-stop")
 def emergency(db:Session=Depends(get_db),user=Depends(require_csrf)):
@@ -127,5 +133,6 @@ def emergency(db:Session=Depends(get_db),user=Depends(require_csrf)):
 @app.get("/api/activity")
 def activity(limit:int=50,db:Session=Depends(get_db),user=Depends(current_user)): return db.scalars(select(Activity).order_by(Activity.created_at.desc()).limit(min(limit,100))).all()
 @app.get("/api/integrations")
-def integrations(user=Depends(current_user)):
-    s=get_settings();return {"gmail":{"status":"connected" if s.gmail_client_id and s.gmail_client_secret else "missing_configuration"},"database":{"status":"connected"},"ai":{"status":"connected" if s.openai_api_key else "mock"},"search":{"status":"connected" if s.search_api_key else "missing_configuration"},"verification":{"status":"connected" if s.email_verification_api_key else "missing_configuration"}}
+def integrations(db:Session=Depends(get_db),user=Depends(current_user)):
+    s=get_settings();gmail=db.get(GmailConnection,1)
+    return {"gmail":{"status":"connected" if gmail and gmail.status=="CONNECTED" else "configured" if s.gmail_client_id and s.gmail_client_secret else "missing_configuration","email":gmail.email if gmail else None},"database":{"status":"connected"},"ai":{"status":"connected" if s.openai_api_key else "mock"},"search":{"status":"connected" if s.brave_search_api_key or s.search_api_key else "missing_configuration"},"verification":{"status":"connected" if s.email_verification_api_key else "missing_configuration"}}

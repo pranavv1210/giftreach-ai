@@ -98,3 +98,60 @@ class AgentSettings(Base):
     company_weekly_limit: Mapped[int] = mapped_column(Integer, default=5)
     approved_categories: Mapped[list] = mapped_column(JSON, default=list)
 
+class DiscoveryCampaign(Base, TimestampMixin):
+    __tablename__="discovery_campaigns"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    cities: Mapped[list] = mapped_column(JSON, default=list)
+    districts: Mapped[list] = mapped_column(JSON, default=list)
+    company_sizes: Mapped[list] = mapped_column(JSON, default=list)
+    industries: Mapped[list] = mapped_column(JSON, default=list)
+    contact_roles: Mapped[list] = mapped_column(JSON, default=list)
+    score_threshold: Mapped[float] = mapped_column(Float, default=40)
+    max_companies: Mapped[int] = mapped_column(Integer, default=25)
+    max_contacts_per_company: Mapped[int] = mapped_column(Integer, default=3)
+    provider: Mapped[str] = mapped_column(String(80), default="brave")
+    generate_drafts: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String(30), default="DRAFT")
+    discovered_count: Mapped[int] = mapped_column(Integer, default=0)
+    qualified_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str|None] = mapped_column(Text)
+
+class CampaignProspect(Base, TimestampMixin):
+    __tablename__="campaign_prospects"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("discovery_campaigns.id"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+    contact_id: Mapped[int|None] = mapped_column(ForeignKey("contacts.id"), index=True)
+    draft_id: Mapped[int|None] = mapped_column(ForeignKey("drafts.id"), index=True)
+    source_query: Mapped[str|None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(40), default="DISCOVERED")
+    __table_args__=(UniqueConstraint("campaign_id","company_id","contact_id",name="uq_campaign_prospect"),)
+
+class Job(Base, TimestampMixin):
+    __tablename__="jobs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_type: Mapped[str] = mapped_column(String(50), index=True)
+    campaign_id: Mapped[int|None] = mapped_column(ForeignKey("discovery_campaigns.id"), index=True)
+    entity_id: Mapped[int|None] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(30), default="PENDING", index=True)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    available_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    locked_at: Mapped[datetime|None] = mapped_column(DateTime)
+    locked_by: Mapped[str|None] = mapped_column(String(100))
+    error_message: Mapped[str|None] = mapped_column(Text)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    dedupe_key: Mapped[str] = mapped_column(String(255), unique=True)
+    cancelled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+class GmailConnection(Base, TimestampMixin):
+    __tablename__="gmail_connections"
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    email: Mapped[str|None] = mapped_column(String(320))
+    encrypted_token: Mapped[str|None] = mapped_column(Text)
+    scopes: Mapped[list] = mapped_column(JSON, default=list)
+    expires_at: Mapped[datetime|None] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(String(30), default="NOT_CONNECTED")
+    oauth_state: Mapped[str|None] = mapped_column(String(255))

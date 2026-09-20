@@ -1,6 +1,5 @@
 # Agent workflow
 
-Modes are OFF, RESEARCH, DRAFT, and CONTROLLED AUTOPILOT. Autopilot never bypasses approval policy, recipient verification, suppression, pause state, kill switch, or rate limits. Discovery and sending can be paused independently. Provider failure should persist an understandable activity event and pause only the affected operation.
+Modes are OFF, RESEARCH, DRAFT, and CONTROLLED AUTOPILOT. RESEARCH runs discovery and contact research. DRAFT additionally queues draft generation. CONTROLLED AUTOPILOT permits delivery, but bulk approval and confirmation remain mandatory. The worker never bypasses recipient verification, suppression, pause state, kill switch, or global/company limits.
 
-The rule-based generator uses only company and contact records and only the centralized approved categories. Follow-ups remain disabled until reply/bounce synchronization and persistent scheduling are configured.
-
+Create and start campaigns from **Discovery**. Their persistent jobs progress through DISCOVER → RESEARCH_COMPANY → GENERATE_DRAFT. Provider failures are recorded on both the job and campaign. Review results in **Bulk review**, where source evidence and exclusion reasons remain visible.

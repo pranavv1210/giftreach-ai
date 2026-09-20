@@ -18,10 +18,12 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     search_api_key: str | None = None
     email_verification_api_key: str | None = None
+    brave_search_api_key: str | None = None
+    token_encryption_key: str | None = None
+    worker_poll_seconds: int = 3
     environment: str = "development"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

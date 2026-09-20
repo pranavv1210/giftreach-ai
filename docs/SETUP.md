@@ -4,3 +4,4 @@ Requires Python 3.11+ and Node 20+. Copy `.env.example` to `.env`; never commit 
 
 The development UI expects the API at `http://localhost:8000`. Override `NEXT_PUBLIC_API_URL` at frontend build time when deploying. Set `FRONTEND_ORIGIN` to the exact dashboard origin so credentialed CORS remains restricted.
 
+For live discovery set `BRAVE_SEARCH_API_KEY`. The persistent worker runs inside the backend process, so keep that process running. Choose RESEARCH or DRAFT mode before starting a campaign. SQLite supports a single local worker; use PostgreSQL before scaling workers horizontally.

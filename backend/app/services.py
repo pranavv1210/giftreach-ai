@@ -33,19 +33,26 @@ def validate_email(subject: str, body: str):
     return errors
 
 def send_mock(db: Session, draft: Draft):
-    settings=db.get(AgentSettings,1)
-    contact=db.get(Contact,draft.contact_id); company=contact.company
+    settings,contact=ensure_send_eligible(db,draft)
+    company=contact.company
+    prior=db.scalar(select(Draft).where(Draft.idempotency_key==draft.idempotency_key,Draft.sent_at.is_not(None)))
+    if prior: return prior.provider_message_id
+    draft.sent_at=datetime.utcnow(); draft.status="SENT"; draft.provider_message_id=f"mock-{uuid.uuid4()}"
+    db.add(Activity(event="email.sent",message=f"Mock email sent to {contact.email}",entity_type="draft",entity_id=draft.id))
+    return draft.provider_message_id
+
+def ensure_send_eligible(db: Session, draft: Draft):
+    settings=db.get(AgentSettings,1);contact=db.get(Contact,draft.contact_id);company=contact.company
     if not settings or settings.kill_switch or settings.paused or settings.sending_paused: raise ValueError("Sending is paused by agent safety controls")
     if settings.mode!="CONTROLLED_AUTOPILOT": raise ValueError("Controlled autopilot is not enabled")
+    if draft.status not in ("APPROVED","SENT"): raise ValueError("Draft is not approved")
     if contact.suppressed or company.suppressed: raise ValueError("Recipient or company is suppressed")
     if contact.verification_status not in ("MX_VALID","PROVIDER_VERIFIED","MANUALLY_VERIFIED"): raise ValueError("Recipient email is not send-eligible")
     if draft.validation_errors: raise ValueError("Draft failed policy validation")
     now=datetime.utcnow(); daily=db.scalar(select(func.count(Draft.id)).where(Draft.sent_at>=now-timedelta(days=1))) or 0
     hourly=db.scalar(select(func.count(Draft.id)).where(Draft.sent_at>=now-timedelta(hours=1))) or 0
     if daily>=settings.daily_limit or hourly>=settings.hourly_limit: raise ValueError("Global sending limit reached")
-    prior=db.scalar(select(Draft).where(Draft.idempotency_key==draft.idempotency_key,Draft.sent_at.is_not(None)))
-    if prior: return prior.provider_message_id
-    draft.sent_at=now; draft.status="SENT"; draft.provider_message_id=f"mock-{uuid.uuid4()}"
-    db.add(Activity(event="email.sent",message=f"Mock email sent to {contact.email}",entity_type="draft",entity_id=draft.id))
-    return draft.provider_message_id
-
+    company_daily=db.scalar(select(func.count(Draft.id)).join(Contact,Contact.id==Draft.contact_id).where(Contact.company_id==company.id,Draft.sent_at>=now-timedelta(days=1))) or 0
+    company_weekly=db.scalar(select(func.count(Draft.id)).join(Contact,Contact.id==Draft.contact_id).where(Contact.company_id==company.id,Draft.sent_at>=now-timedelta(days=7))) or 0
+    if company_daily>=settings.company_daily_limit or company_weekly>=settings.company_weekly_limit:raise ValueError("Company sending limit reached")
+    return settings,contact
